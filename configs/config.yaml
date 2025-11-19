@@ -1,0 +1,96 @@
+server:
+  host: "0.0.0.0"
+  port: 8080
+  grpc_port: 9090
+  read_timeout: 30s
+  write_timeout: 30s
+
+storage:
+  type: "redis" # Options: redis, postgres, memory
+
+  redis:
+    addr: "localhost:6379"
+    password: ""
+    db: 0
+    max_retries: 3
+    pool_size: 10
+    min_idle_conns: 5
+
+  postgres:
+    dsn: "postgres://user:pass@localhost:5432/gotask?sslmode=disable"
+    max_connections: 50
+    max_idle_connections: 10
+    connection_lifetime: 1h
+
+queues:
+  default:
+    max_workers: 10
+    max_retries: 3
+    retry_strategy: "exponential"
+    retry_delay: 5s
+    max_retry_delay: 1h
+    default_timeout: 5m
+    priority: 5
+    weight: 1
+    rate_limit: 0 # 0 = no limit
+
+  high_priority:
+    max_workers: 20
+    max_retries: 5
+    retry_strategy: "exponential"
+    retry_delay: 3s
+    max_retry_delay: 30m
+    default_timeout: 10m
+    priority: 10
+    weight: 2
+    rate_limit: 0
+
+  batch:
+    max_workers: 5
+    max_retries: 2
+    retry_strategy: "linear"
+    retry_delay: 10s
+    default_timeout: 30m
+    priority: 3
+    weight: 1
+    rate_limit: 100 # max 100 jobs per second
+
+worker:
+  concurrency: 10
+  heartbeat_interval: 30s
+  heartbeat_timeout: 90s
+  shutdown_timeout: 30s
+  prefetch_count: 5
+
+monitoring:
+  metrics_port: 2112
+  enable_profiling: true
+  profiling_port: 6060
+  log_level: "info" # Options: debug, info, warn, error
+  log_format: "json" # Options: json, text
+
+scheduler:
+  tick_interval: 10s
+  lookahead_window: 1h
+  max_scheduled_jobs: 10000
+
+dashboard:
+  enabled: true
+  port: 3000
+  websocket_path: "/ws"
+  static_path: "./web/static"
+
+security:
+  enable_auth: false
+  jwt_secret: "change-me-in-production"
+  api_keys:
+    - "dev-key-12345"
+  tls_enabled: false
+  tls_cert_file: ""
+  tls_key_file: ""
+
+limits:
+  max_job_size: 1048576 # 1MB
+  max_payload_size: 524288 # 512KB
+  max_queue_size: 100000
+  job_ttl: 168h # 7 days
