@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # Redis - Primary storage backend
+  redis:
+    image: redis:7-alpine
+    container_name: taskqueue-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - taskqueue-network
+
+  # PostgreSQL - Alternative storage backend
+  postgres:
+    image: postgres:16-alpine
+    container_name: taskqueue-postgres
+    environment:
+      POSTGRES_DB: taskqueue
+      POSTGRES_USER: taskqueue
+      POSTGRES_PASSWORD: taskqueue
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U taskqueue"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - taskqueue-network
+
+  # GoTask Server
+  server:
+    build:
+      context: .
+      target: server
+    container_name: taskqueue-server
+    ports:
+      - "8080:8080"   # HTTP API
+      - "9090:9090"   # Metrics
+    environment:
+      - STORAGE_BACKEND=redis
+      - REDIS_ADDR=redis:6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=taskqueue
+      - POSTGRES_USER=taskqueue
+      - POSTGRES_PASSWORD=taskqueue
+    command: >
+      -storage=redis
+      -redis-addr=redis:6379
+      -http-addr=0.0.0.0
+      -http-port=8080
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks:
+      - taskqueue-network
+    restart: unless-stopped
+
+  # GoTask Worker
+  worker:
+    build:
+      context: .
+      target: worker
+    container_name: taskqueue-worker
+    environment:
+      - STORAGE_BACKEND=redis
+      - REDIS_ADDR=redis:6379
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=taskqueue
+      - POSTGRES_USER=taskqueue
+      - POSTGRES_PASSWORD=taskqueue
+    command: >
+      -storage=redis
+      -redis-addr=redis:6379
+      -queues=default
+      -concurrency=4
+    depends_on:
+      redis:
+        condition: service_healthy
+      server:
+        condition: service_started
+    networks:
+      - taskqueue-network
+    restart: unless-stopped
+    deploy:
+      replicas: 2  # Run 2 worker instances
+
+  # Prometheus - Metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: taskqueue-prometheus
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./deployments/prometheus:/etc/prometheus
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - taskqueue-network
+    restart: unless-stopped
+
+  # Grafana - Metrics visualization
+  grafana:
+    image: grafana/grafana:latest
+    container_name: taskqueue-grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - ./deployments/grafana:/etc/grafana/provisioning
+      - grafana-data:/var/lib/grafana
+    depends_on:
+      - prometheus
+    networks:
+      - taskqueue-network
+    restart: unless-stopped
+
+volumes:
+  redis-data:
+  postgres-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  taskqueue-network:
+    driver: bridge
