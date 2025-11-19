@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/UmangDiyora/gotask/pkg/job"
+	"github.com/Distributed-Task-Queue-System/pkg/job"
 )
 
 // JobStore defines the interface for job persistence operations
