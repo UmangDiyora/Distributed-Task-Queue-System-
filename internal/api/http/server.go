@@ -57,6 +57,10 @@ func NewServer(qm *queue.Manager, sched *scheduler.Scheduler, config *Config) *S
 
 // setupRoutes sets up HTTP routes
 func (s *Server) setupRoutes() {
+	// Dashboard (root)
+	s.mux.HandleFunc("/", s.handleDashboard)
+	s.mux.Handle("/web/", http.StripPrefix("/web/", http.FileServer(http.Dir("./web"))))
+
 	// Health check
 	s.mux.HandleFunc("/health", s.handleHealth)
 	s.mux.HandleFunc("/ready", s.handleReady)
@@ -110,6 +114,14 @@ func (s *Server) handleReady(w http.ResponseWriter, r *http.Request) {
 		"status": "ready",
 		"time":   time.Now().Format(time.RFC3339),
 	})
+}
+
+func (s *Server) handleDashboard(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, "./web/index.html")
 }
 
 // ===== Job Handlers =====
