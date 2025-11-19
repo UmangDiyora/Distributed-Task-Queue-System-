@@ -1,0 +1,178 @@
+syntax = "proto3";
+
+package taskqueue;
+
+option go_package = "github.com/Distributed-Task-Queue-System/internal/api/grpc/pb";
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/struct.proto";
+
+// TaskQueue service definition
+service TaskQueueService {
+  // Job operations
+  rpc CreateJob(CreateJobRequest) returns (CreateJobResponse);
+  rpc GetJob(GetJobRequest) returns (GetJobResponse);
+  rpc ListJobs(ListJobsRequest) returns (ListJobsResponse);
+  rpc CancelJob(CancelJobRequest) returns (CancelJobResponse);
+  rpc DeleteJob(DeleteJobRequest) returns (DeleteJobResponse);
+
+  // Queue operations
+  rpc CreateQueue(CreateQueueRequest) returns (CreateQueueResponse);
+  rpc GetQueue(GetQueueRequest) returns (GetQueueResponse);
+  rpc ListQueues(ListQueuesRequest) returns (ListQueuesResponse);
+  rpc PauseQueue(PauseQueueRequest) returns (PauseQueueResponse);
+  rpc ResumeQueue(ResumeQueueRequest) returns (ResumeQueueResponse);
+  rpc GetQueueStats(GetQueueStatsRequest) returns (GetQueueStatsResponse);
+
+  // Health check
+  rpc HealthCheck(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+// Job messages
+message Job {
+  string id = 1;
+  string type = 2;
+  string queue = 3;
+  google.protobuf.Struct payload = 4;
+  bytes result = 5;
+  string error = 6;
+  string status = 7;
+  int32 priority = 8;
+  int32 retry_count = 9;
+  int32 max_retries = 10;
+  int32 timeout_seconds = 11;
+  int32 progress = 12;
+  google.protobuf.Struct metadata = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp updated_at = 15;
+  google.protobuf.Timestamp started_at = 16;
+  google.protobuf.Timestamp completed_at = 17;
+  google.protobuf.Timestamp scheduled_at = 18;
+}
+
+message CreateJobRequest {
+  Job job = 1;
+}
+
+message CreateJobResponse {
+  Job job = 1;
+}
+
+message GetJobRequest {
+  string id = 1;
+}
+
+message GetJobResponse {
+  Job job = 1;
+}
+
+message ListJobsRequest {
+  string queue = 1;
+  string status = 2;
+  int32 limit = 3;
+  int32 offset = 4;
+}
+
+message ListJobsResponse {
+  repeated Job jobs = 1;
+  int32 total = 2;
+}
+
+message CancelJobRequest {
+  string id = 1;
+}
+
+message CancelJobResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message DeleteJobRequest {
+  string id = 1;
+}
+
+message DeleteJobResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+// Queue messages
+message QueueConfig {
+  string name = 1;
+  int32 max_workers = 2;
+  int32 max_retries = 3;
+  string retry_strategy = 4;
+  int32 retry_delay = 5;
+  int32 max_retry_delay = 6;
+  int32 timeout = 7;
+  int32 priority = 8;
+  int32 weight = 9;
+  int32 rate_limit = 10;
+  string dead_letter_queue = 11;
+  google.protobuf.Struct metadata = 12;
+}
+
+message CreateQueueRequest {
+  QueueConfig config = 1;
+}
+
+message CreateQueueResponse {
+  QueueConfig config = 1;
+}
+
+message GetQueueRequest {
+  string name = 1;
+}
+
+message GetQueueResponse {
+  QueueConfig config = 1;
+}
+
+message ListQueuesRequest {}
+
+message ListQueuesResponse {
+  repeated QueueConfig queues = 1;
+  int32 total = 2;
+}
+
+message PauseQueueRequest {
+  string name = 1;
+}
+
+message PauseQueueResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message ResumeQueueRequest {
+  string name = 1;
+}
+
+message ResumeQueueResponse {
+  bool success = 1;
+  string message = 2;
+}
+
+message GetQueueStatsRequest {
+  string name = 1;
+}
+
+message QueueStats {
+  string queue_name = 1;
+  int64 pending_count = 2;
+  int64 running_count = 3;
+  int64 success_count = 4;
+  int64 failed_count = 5;
+}
+
+message GetQueueStatsResponse {
+  QueueStats stats = 1;
+}
+
+// Health check
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  string status = 1;
+  google.protobuf.Timestamp timestamp = 2;
+}

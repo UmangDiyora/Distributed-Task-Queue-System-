@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/UmangDiyora/gotask/pkg/errors"
-	"github.com/UmangDiyora/gotask/pkg/job"
+	"github.com/Distributed-Task-Queue-System/pkg/errors"
+	"github.com/Distributed-Task-Queue-System/pkg/job"
 	"github.com/redis/go-redis/v9"
 )
 

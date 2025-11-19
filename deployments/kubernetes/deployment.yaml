@@ -1,0 +1,275 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: taskqueue
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: taskqueue-config
+  namespace: taskqueue
+data:
+  storage_backend: "redis"
+  redis_addr: "redis-service:6379"
+  http_addr: "0.0.0.0"
+  http_port: "8080"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: taskqueue-secrets
+  namespace: taskqueue
+type: Opaque
+stringData:
+  postgres_password: "taskqueue"
+  redis_password: ""
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taskqueue-server
+  namespace: taskqueue
+  labels:
+    app: taskqueue
+    component: server
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: taskqueue
+      component: server
+  template:
+    metadata:
+      labels:
+        app: taskqueue
+        component: server
+    spec:
+      containers:
+      - name: server
+        image: taskqueue:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: STORAGE_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: taskqueue-config
+              key: storage_backend
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: taskqueue-config
+              key: redis_addr
+        args:
+        - "-storage=$(STORAGE_BACKEND)"
+        - "-redis-addr=$(REDIS_ADDR)"
+        - "-http-addr=0.0.0.0"
+        - "-http-port=8080"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: taskqueue-worker
+  namespace: taskqueue
+  labels:
+    app: taskqueue
+    component: worker
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: taskqueue
+      component: worker
+  template:
+    metadata:
+      labels:
+        app: taskqueue
+        component: worker
+    spec:
+      containers:
+      - name: worker
+        image: taskqueue:latest
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: STORAGE_BACKEND
+          valueFrom:
+            configMapKeyRef:
+              name: taskqueue-config
+              key: storage_backend
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: taskqueue-config
+              key: redis_addr
+        args:
+        - "-storage=$(STORAGE_BACKEND)"
+        - "-redis-addr=$(REDIS_ADDR)"
+        - "-queues=default"
+        - "-concurrency=4"
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "1000m"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: taskqueue-server
+  namespace: taskqueue
+  labels:
+    app: taskqueue
+    component: server
+spec:
+  type: LoadBalancer
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8080
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  selector:
+    app: taskqueue
+    component: server
+
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: taskqueue
+spec:
+  serviceName: redis-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+          name: redis
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+        command: ["redis-server"]
+        args: ["--appendonly", "yes"]
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+  volumeClaimTemplates:
+  - metadata:
+      name: redis-data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      resources:
+        requests:
+          storage: 10Gi
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-service
+  namespace: taskqueue
+spec:
+  clusterIP: None
+  ports:
+  - port: 6379
+    targetPort: 6379
+    name: redis
+  selector:
+    app: redis
+
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: taskqueue-worker-hpa
+  namespace: taskqueue
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: taskqueue-worker
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: taskqueue-ingress
+  namespace: taskqueue
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  rules:
+  - host: taskqueue.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: taskqueue-server
+            port:
+              number: 80

@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GoTask - Distributed Task Queue</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🚀 GoTask Dashboard</h1>
+            <p class="subtitle">Distributed Task Queue System</p>
+        </header>
+
+        <!-- System Overview -->
+        <section class="overview">
+            <div class="stat-card">
+                <h3>Total Jobs</h3>
+                <p class="stat-value" id="totalJobs">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Pending</h3>
+                <p class="stat-value pending" id="pendingJobs">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Running</h3>
+                <p class="stat-value running" id="runningJobs">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Completed</h3>
+                <p class="stat-value success" id="completedJobs">0</p>
+            </div>
+            <div class="stat-card">
+                <h3>Failed</h3>
+                <p class="stat-value failed" id="failedJobs">0</p>
+            </div>
+        </section>
+
+        <!-- Create Job Form -->
+        <section class="create-job">
+            <h2>Create New Job</h2>
+            <form id="createJobForm">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="jobType">Job Type:</label>
+                        <select id="jobType" required>
+                            <option value="echo">Echo</option>
+                            <option value="math">Math</option>
+                            <option value="email">Email</option>
+                            <option value="report">Report</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="queue">Queue:</label>
+                        <select id="queue">
+                            <option value="default">default</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="priority">Priority:</label>
+                        <select id="priority">
+                            <option value="0">Low</option>
+                            <option value="1" selected>Normal</option>
+                            <option value="2">High</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label for="payload">Payload (JSON):</label>
+                    <textarea id="payload" rows="4" placeholder='{"message": "Hello, World!"}'></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Job</button>
+            </form>
+        </section>
+
+        <!-- Queues -->
+        <section class="queues">
+            <h2>Queues</h2>
+            <div id="queuesList" class="queue-list"></div>
+        </section>
+
+        <!-- Jobs List -->
+        <section class="jobs">
+            <h2>Recent Jobs</h2>
+            <div class="filter-bar">
+                <select id="filterStatus">
+                    <option value="">All Statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="running">Running</option>
+                    <option value="success">Success</option>
+                    <option value="failed">Failed</option>
+                </select>
+                <select id="filterQueue">
+                    <option value="">All Queues</option>
+                    <option value="default">default</option>
+                </select>
+                <button onclick="refreshJobs()" class="btn btn-secondary">Refresh</button>
+            </div>
+            <div id="jobsList" class="jobs-table"></div>
+        </section>
+
+        <!-- Schedules -->
+        <section class="schedules">
+            <h2>Recurring Schedules</h2>
+            <div id="schedulesList" class="schedule-list"></div>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
